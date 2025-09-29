@@ -1,225 +1,404 @@
-# KG-R1: Knowledge Graph Reasoning with Reinforcement Learning
+# KG-R1: Efficient and Transferable Knowledge Graph-Augmented Reinforcement Learning
 
-[![Paper](https://img.shields.io/badge/Paper-ICLR_2026-blue.svg)](https://arxiv.org/abs/PLACEHOLDER)
-[![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.9-blue.svg)](https://www.python.org/)
+## Latest Update - ICLR 2026 Submission
 
-KG-R1 is a **single-agent knowledge graph reasoning system** that enables language models to perform multi-turn reasoning over structured knowledge graphs through reinforcement learning. Using Group Relative Policy Optimization (GRPO), KG-R1 learns efficient knowledge graph exploration strategies with cross-KG transferability.
+**📄 Paper Submitted**: KG-R1 methodology submitted to ICLR 2026 - [KG-R1: Efficient and Transferable Agentic KG-RAG via RL](https://arxiv.org/abs/PLACEHOLDER).
 
-## 🚀 Key Features
+**🔬 Key Innovation - Single-Agent KG Reasoning**:
+1. ✅ **Single-Agent Architecture**: Replaces complex multi-module workflows with unified LLM agent
+2. ✅ **Schema-Agnostic KG Server**: Works across different knowledge graphs (Freebase, Wikidata, Temporal KGs)  
+3. ✅ **Cross-KG Transferability**: Plug-and-play capability - train once, transfer anywhere
+4. ✅ **Efficiency Breakthrough**: ~83% of tokens from KG retrieval, only ~13% from reasoning generation
+5. ✅ **GRPO Training**: Group Relative Policy Optimization for stable multi-turn learning
 
-- **🤖 Single-Agent Architecture**: Unified LLM agent replaces complex multi-module KG-RAG pipelines
-- **🔄 Schema-Agnostic KG Server**: Works across different knowledge graphs (Freebase, Wikidata, Temporal KGs)  
-- **📈 Cross-KG Transferability**: Train once, deploy on multiple knowledge graph schemas
-- **⚡ Multi-turn Reasoning**: Up to 7 turns of iterative knowledge graph exploration
-- **🎯 GRPO Training**: Stable reinforcement learning with group relative policy optimization
-- **📊 Comprehensive Evaluation**: Pass@K metrics, FLOP analysis, LLM-as-judge evaluation
+**⚡ System Architecture**:
+- **KG Server**: 4 basic operations (get_tail_relations, get_head_relations, get_tail_entities, get_head_entities)
+- **Single Agent**: Unified reasoning and retrieval in one LLM with special tokens
+- **Multi-turn Interaction**: Up to 7 turns of KG exploration per question
+- **Lightweight Design**: No separate retriever, reranker, or planning modules
 
-## 🏗️ System Architecture
+**📊 Performance Results**:
+- **CWQ Dataset**: Significant improvement over vanilla baselines and prior KG-RAG methods
+- **WebQSP Dataset**: Strong performance with cross-dataset transferability
+- **Efficiency Gains**: ~1680x computational cost vs naive calculation, but highly effective
+- **Transferability**: Models trained on one KG work on different KG schemas
 
+**🚀 Current Status**: Production-ready KG-R1 system with comprehensive evaluation framework and LLM-as-judge factuality evaluation for Knowledge Graph Question Answering.
+
+## KG-R1 System Architecture
+
+### 1. Single-Agent KG-Augmented Prompt
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Language      │    │  KG Operations   │    │  Knowledge      │
-│   Model         │◄──►│  Interface       │◄──►│  Graph Server   │
-│   (Qwen2.5-3B)  │    │  (4 primitives)  │    │  (Any Schema)   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   GRPO          │    │  Multi-turn      │    │  Structured     │
-│   Training      │    │  Reasoning       │    │  Retrieval      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-```
+Answer the given question. You can interact with the knowledge graph through the following actions:
 
-## 🔧 Core KG Operations
+- get_tail_relations(entity): Get relations where entity is the subject
+- get_head_relations(entity): Get relations where entity is the object  
+- get_tail_entities(entity, relation): Get objects for entity-relation pairs
+- get_head_entities(entity, relation): Get subjects for relation-entity pairs
 
-KG-R1 uses four primitive operations that work across different knowledge graph schemas:
+Use <search>action_name(arguments)</search> to query the KG. Results appear in <information></information>.
+Reason with <think></think> tags. Provide final answer in <answer></answer> tags.
 
-```python
-# 1. Get outgoing relations from an entity
-get_tail_relations("Barack_Obama")
-# → ["profession", "birthplace", "spouse", ...]
-
-# 2. Get entities connected via a specific relation
-get_tail_entities("Barack_Obama", "profession") 
-# → ["President", "Lawyer", "Author"]
-
-# 3. Get incoming relations to an entity  
-get_head_relations("Hawaii")
-# → ["birthplace_of", "location_of", "part_of", ...]
-
-# 4. Get entities that point to target via relation
-get_head_entities("Hawaii", "birthplace_of")
-# → ["Barack_Obama", "Jason_Momoa", ...]
+Question: {question}
 ```
 
-## 📊 Multi-turn Reasoning Example
+### 2. Knowledge Graph Server Operations
+**Base URL**: `http://127.0.0.1:8001/retrieve`
 
-```
-Question: "Who was the president when Barack Obama was born?"
+**Core Operations**:
+- **get_tail_relations(entity)**: Find all relations where entity is the head/subject
+- **get_head_relations(entity)**: Find all relations where entity is the tail/object
+- **get_tail_entities(entity, relation)**: Get tail entities for head-relation pairs
+- **get_head_entities(entity, relation)**: Get head entities for relation-tail pairs
 
-Turn 1: <search>get_tail_relations("Barack_Obama")</search>
-<information>Relations: ["birthdate", "birthplace", "profession", ...]</information>
+### 3. Multi-Turn Reasoning Process
+KG-R1 enables iterative exploration:
+1. **Initial Question Analysis** → Identify key entities
+2. **KG Exploration** → Multi-turn relation and entity discovery (up to 7 turns)
+3. **Answer Synthesis** → Combine retrieved knowledge for final answer
 
-Turn 2: <search>get_tail_entities("Barack_Obama", "birthdate")</search>
-<information>Entities: ["August_4_1961"]</information>
+### 4. LLM-as-Judge Evaluation
+Semantic factuality evaluation using GPT-based judge for accurate answer assessment beyond exact string matching.
 
-Turn 3: <search>get_head_entities("1961", "president_during_year")</search>
-<information>Entities: ["John F. Kennedy"]</information>
+## KG-R1 Architecture Overview
 
-<answer>John F. Kennedy was the president when Barack Obama was born in 1961.</answer>
-```
+<div align="center">
+  <img src="imgs/fig1.png" alt="KG-R1 vs Multi-Module Workflow" width="800"/>
+  <p><em>Figure 1: KG-R1 single-agent framework vs traditional multi-module KG-RAG workflows</em></p>
+</div>
 
-## 🛠️ Quick Start
+## Multi-Turn KG Reasoning Process
 
-### Installation
+<div align="center">
+  <img src="imgs/fig2.png" alt="KG-R1 Multi-Turn Interaction" width="800"/>
+  <p><em>Figure 2: KG-R1 multi-turn interaction trajectory showing iterative knowledge graph exploration</em></p>
+</div>
 
+<p align="center">
+  <a href="https://arxiv.org/abs/2503.09516">
+    <img src="https://img.shields.io/badge/Paper1-blue?style=for-the-badge" alt="Button1"/>
+  </a>
+  <a href="https://arxiv.org/abs/2505.15117">
+    <img src="https://img.shields.io/badge/Paper2-green?style=for-the-badge" alt="Button2"/>
+  </a>
+  <a href="https://huggingface.co/collections/PeterJinGo/search-r1-67d1a021202731cb065740f5">
+    <img src="https://img.shields.io/badge/Resources-orange?style=for-the-badge" alt="Button3"/>
+  </a>
+  <a href="https://x.com/BowenJin13/status/1895544294473109889">
+    <img src="https://img.shields.io/badge/Tweet-red?style=for-the-badge" alt="Button4"/>
+  </a>
+  <a href="https://wandb.ai/peterjin/Search-R1-v0.2">
+    <img src="https://img.shields.io/badge/Logs-purple?style=for-the-badge" alt="Button5"/>
+  </a>
+</p>
+
+**KG-R1** extends the Search-R1 framework to **knowledge graph-augmented reasoning**, replacing traditional document retrieval with structured knowledge graph operations. This creates a more efficient and transferable agentic KG-RAG system.
+
+Built upon [veRL](https://github.com/volcengine/verl), KG-R1 provides a unified single-agent architecture that learns to reason and interact with knowledge graphs through reinforcement learning. The system achieves both computational efficiency (~83% tokens from KG retrieval vs ~13% from reasoning) and cross-KG transferability.
+
+We support different RL methods (PPO, GRPO), different LLMs (Qwen2.5, Llama3, etc), and different knowledge graph schemas (Freebase, Wikidata, temporal KGs) with a plug-and-play design.
+
+Paper: [link1](https://arxiv.org/pdf/2503.09516), [link2](https://arxiv.org/abs/2505.15117); Model and data: [link](https://huggingface.co/collections/PeterJinGo/search-r1-67d1a021202731cb065740f5); Twitter thread: [link](https://x.com/BowenJin13/status/1895544294473109889); Full experiment log: [prelim](https://wandb.ai/peterjin/Search-R1-open); [v0.1](https://wandb.ai/peterjin/Search-R1-nq_hotpotqa_train); [v0.2](https://wandb.ai/peterjin/Search-R1-v0.2); [v0.3](https://wandb.ai/peterjin/Search-R1-v0.3). Details about these logs and methods can be find [here](https://github.com/PeterGriffinJin/Search-R1/blob/main/docs/experiment_log.md).
+
+**Key Innovation**: KG-R1 replaces complex multi-module workflows with a single unified agent that learns to reason and retrieve through reinforcement learning, achieving both efficiency and transferability across different knowledge graph schemas.
+
+## News
+
+- [2025.12] **📄 KG-R1 submitted to ICLR 2026** Paper: "KG-R1: Efficient and Transferable Agentic KG-RAG via RL"
+- [2025.12] Added comprehensive evaluation framework with LLM-as-judge for factuality assessment
+- [2025.11] Implemented cross-KG transferability testing on multiple knowledge graphs
+- [2025.10] Released KG-R1 codebase with GRPO training and multi-turn KG reasoning
+- [2025.9] Achieved significant performance gains on CWQ and WebQSP benchmarks
+- [2025.8] Developed schema-agnostic KG server with 4 basic operations
+
+## Links
+
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [KG-R1 Results](#kg-r1-results)
+- [Inference](#inference)
+- [Use your own dataset](#use-your-own-dataset)
+- [Use your own knowledge graph](#use-your-own-knowledge-graph)
+- [Features](#features)
+- [Acknowledge](#acknowledge)
+- [Citations](#citations)
+
+## Installation
+
+### KG-R1 environment
 ```bash
-# Create environment
-conda create -n kg_r1 python=3.9
-conda activate kg_r1
-
-# Install dependencies
+conda create -n kgr1 python=3.9
+conda activate kgr1
+# install torch [or you can skip this step and let vllm to install the correct version for you]
 pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cu121
-pip install vllm==0.6.3
+# install vllm
+pip3 install vllm==0.6.3 # or you can install 0.5.4, 0.4.2 and 0.3.1
+
+# verl
 pip install -e .
 
-# Additional dependencies
-pip install flash-attn --no-build-isolation
-pip install wandb transformers datasets uvicorn fastapi pandas pyarrow
+# flash attention 2
+pip3 install flash-attn --no-build-isolation
+pip install wandb
+
+# Additional dependencies for KG processing
+pip install fastapi uvicorn requests aiohttp
+pip install networkx # for knowledge graph operations
 ```
 
-### Basic Usage
+### KG Server environment (required)
+The KG-R1 system requires a knowledge graph server for retrieval operations.
+```bash
+conda create -n kg_server python=3.10
+conda activate kg_server
+
+# Core dependencies for KG server
+pip install fastapi uvicorn pydantic requests
+pip install transformers datasets huggingface_hub
+pip install networkx pandas pyarrow
+
+# For efficient KG processing
+pip install numpy scipy
+```
+
+## Quick start
+
+Train a KG-R1 agent on ComplexWebQuestions (CWQ) dataset using GRPO (Group Relative Policy Optimization). See [Figure 2](imgs/fig2.png) for the multi-turn interaction process.
+
+### 🚀 **4-Step Setup**
+
+**(1) Download and prepare KG-QA datasets**
+```bash
+# Download CWQ and WebQSP datasets with pre-computed knowledge subgraphs
+python scripts/data_kg/setup_datasets.py --save_path data_kg
+
+# This creates:
+# data_kg/cwq_search_augmented_initial_entities/
+# data_kg/webqsp_search_augmented_initial_entities/
+```
+
+**(2) Launch the KG retrieval server**
+```bash
+conda activate kg_server
+# Start KG server on port 8001 (provides 4 basic KG operations)
+python kg_r1/search/server.py --port 8001 --data_dir data_kg
+```
+
+**(3) Run KG-R1 training with GRPO**
+```bash
+conda activate kgr1
+# Train Qwen2.5-3B with 7-turn KG reasoning (see Figure 1 for architecture)
+bash train_grpo_kg_qwen_3b_cwq_f1_turn7.sh
+```
+
+**(4) Evaluate the trained model**
+```bash
+# Run evaluation with Pass@K metrics and LLM-as-judge
+bash eval_scripts/kg_r1_eval_main/eval_qwen_3b_cwq_f1_turn7.sh
+```
+
+**Expected Results**: 70.9 F1 / 73.8 Hit@1 on CWQ with single 3B model (see [Performance Results](#performance-results))
+
+## KG-R1 Results
+
+### Performance Results
+
+**Main Results on WebQSP and CWQ:**
+
+| Method | Model | Modules | WebQSP F1/Hit@1 | CWQ F1/Hit@1 | Efficiency (Total/Gen) |
+|--------|-------|---------|------------------|---------------|------------------------|
+| **Vanilla** | Qwen2.5-3B-it | 1 | 29.4 / 46.6 | 16.6 / 21.1 | 95-104 / 30-42 |
+| **COT** | Qwen2.5-3B-it | 1 | 30.6 / 47.6 | 17.3 / 21.4 | 131-140 / 192-216 |
+| **RoG** | LLaMA2-7B-it | 2 | 70.8 / 85.7 | 56.2 / 62.6 | 1.1-1.2K / 266-295 |
+| **ToG 2.0** | GPT-3.5 | 5 | 74.5 / 77.8 | 65.8 / 68.9 | 3.8-39K / 605-650 |
+| **ReKnoS** | GPT-4o-mini | 3 | 73.7 / 81.1 | 64.7 / 66.8 | 3.1-4.1K / 617-752 |
+| **🔥 KG-R1 (1 run)** | Qwen2.5-3B-it | **1** | **77.5 / 84.7** | **70.9 / 73.8** | 3.2-3.3K / 302-377 |
+| **🔥 KG-R1 (3 runs)** | Qwen2.5-3B-it | **1** | **85.8 / 91.7** | **81.0 / 83.9** | 9.7-10K / 906-1.1K |
+
+### Cross-KG Transferability Results
+
+**Zero-shot transfer across different KG schemas (no retraining required):**
+
+| Training KG | SimpleQA | GrailQA | T-REx | QALD-10en | MultiTQ | **Average** |
+|-------------|----------|---------|-------|-----------|---------|-------------|
+| **Vanilla Baseline** | 13.7 / 13.7 | 15.9 / 15.9 | 24.4 / 24.4 | 23.8 / 23.8 | 2.2 / 5.4 | 19.4 / 19.8 |
+| **KG-R1 (WebQSP)** | 59.1 / 59.1 | 32.8 / 38.5 | 80.5 / 84.5 | 51.9 / 53.4 | 21.6 / 31.4 | **64.0 / 68.3** |
+| **KG-R1 (CWQ)** | 64.6 / 64.7 | 42.8 / 50.2 | 81.3 / 85.6 | 55.9 / 57.7 | 27.1 / 38.9 | **67.2 / 72.1** |
+| **KG-R1 (3 runs)** | 73.1 / 73.1 | 52.8 / 61.0 | 86.8 / 91.5 | 63.9 / 65.5 | 36.2 / 48.4 | **74.1 / 79.4** |
+
+### Key Achievements
+- **🎯 State-of-the-art Performance**: Best results on CWQ and competitive on WebQSP
+- **⚡ Computational Efficiency**: Single-agent vs multi-module workflows (1 vs 2-5 modules)
+- **🔄 Cross-KG Transfer**: 64-74% average F1 across 5 different KG schemas
+- **💡 Training Efficiency**: 3B model outperforms 7B and GPT-based systems
+
+## Inference
+#### You can play with the trained KG-R1 model with your own questions.
+(1) Launch the KG retrieval server.
+```bash
+conda activate kg_server
+python kg_r1/search/server.py --port 8001 --data_dir data_kg
+```
+
+(2) Run KG-R1 inference.
+```bash
+conda activate kgr1
+python infer_kg_r1.py --checkpoint verl_checkpoints/your_trained_model
+```
+You can modify the `question` parameter to test different knowledge graph questions. The model will interactively explore the KG using the 4 basic operations and provide reasoning traces.
+
+## Use your own dataset
+
+### KG-QA data format
+For each knowledge graph question-answer sample, it should be a dictionary containing:
 
 ```python
-from kg_r1 import KGReasoningAgent
-
-# Initialize agent with pre-trained model
-agent = KGReasoningAgent(
-    model_path="path/to/trained/model",
-    kg_server_url="http://localhost:8001"
-)
-
-# Perform multi-turn reasoning
-question = "Who was the president when Barack Obama was born?"
-answer = agent.reason(question)
-print(f"Answer: {answer}")
-```
-
-### Training Your Own Model
-
-```bash
-# 1. Start KG server
-python kg_r1/search/kg_retrieval_server.py --base_data_path data_kg --port 8001
-
-# 2. Train with GRPO
-bash scripts/train_grpo_kg_qwen_3b_cwq.sh
-
-# 3. Evaluate trained model  
-bash scripts/eval_kg_r1_comprehensive.sh
-```
-
-## 📈 Performance Results
-
-### Efficiency Analysis
-- **Token Distribution**: ~83% KG information, ~13% reasoning generation, ~4% prompt
-- **Computational Cost**: ~51,479 GFLOPs for complex multi-turn reasoning
-- **Context Management**: Efficient context growth (512 → 550 tokens across turns)
-
-### Cross-KG Transferability
-- **Freebase → Wikidata**: Zero-shot transfer with minimal performance drop
-- **Entity-focused → Temporal**: Adapts to time-aware reasoning tasks
-- **Schema Agnostic**: Same operations work across different KG formats
-
-## 🗃️ Supported KG Formats
-
-- **Freebase**: Mid-based entities (`m.abc123`), dotted relations (`people.person.place_of_birth`)
-- **Wikidata**: Q/P-based entities (`Q76`), property relations (`P19`)
-- **Temporal KGs**: Date-annotated entities, temporal relations
-- **Domain KGs**: Custom entity/relation vocabularies
-- **Multilingual KGs**: Same structure, different languages
-
-## 📊 Evaluation Framework
-
-### Metrics Suite
-```bash
-# Run comprehensive evaluation
-bash eval_scripts/eval_kg_r1_comprehensive.sh
-
-# Key metrics generated:
-# - Pass@K (K=1,2,3,4): Multi-attempt accuracy
-# - F1/Precision/Recall: Answer quality scores  
-# - FLOP Analysis: Computational efficiency
-# - Turn Statistics: Multi-turn reasoning patterns
-# - LLM-as-Judge: Semantic evaluation beyond exact match
-```
-
-### Cross-Dataset Evaluation
-```bash
-# Test transferability across different KG schemas
-bash eval_scripts/run_cross_kg_evaluation.sh
-
-# Evaluates on: CWQ, WebQSP, MultiTQ, GrailQA, SimpleQA, T-REx
-```
-
-## 🏗️ Training Your Own Models
-
-### Data Format
-```python
-# Each training sample requires:
-{
-    "id": "sample_001",
-    "question": "What is the capital of France?",
-    "answers": ["Paris"],
-    "data_source": "kgR1_dataset",
-    "subgraph": {
-        "entities": ["France", "Paris", "Europe", ...],
-        "relations": ["capital_of", "located_in", "part_of", ...], 
-        "tuples": [[0, 1, 1], [1, 2, 2], ...]  # (head_idx, rel_idx, tail_idx)
-    }
+data = {
+    "data_source": "your_kg_dataset",
+    "original_query": question,
+    "target_text": answer,
+    "query_entities": ["entity1", "entity2"],  # Initial entities
+    "query_id": unique_id,
+    "split": "train/test/dev"
 }
 ```
 
-### Training Pipeline
-```bash
-# 1. Convert your dataset to KG-R1 format
-python scripts/data_conversion/convert_to_kg_format.py \
-    --input_file your_dataset.json \
-    --output_dir data_kg/your_dataset/
+### Knowledge Graph format
+Your knowledge graph should provide the following structure:
 
-# 2. Set up KG server for your knowledge graph  
-python scripts/kg_setup/setup_kg_server.py --kg_path /path/to/your/kg
-
-# 3. Train with GRPO
-bash scripts/train_grpo_kg_your_dataset.sh
+```python
+# Entity-relation-entity triples
+kg_data = {
+    "entities": {"entity_id": "human_readable_name"},
+    "relations": {"relation_id": "human_readable_name"},
+    "triples": [
+        ["head_entity_id", "relation_id", "tail_entity_id"],
+        # ... more triples
+    ]
+}
 ```
 
-## 📚 Citation
+You can refer to `scripts/data_kg/process_datasets.py` for concrete data processing examples for CWQ and WebQSP datasets.
+
+### Knowledge Graph Server Setup
+
+To use your own knowledge graph, you need to set up the KG server with your data:
+
+1. **Prepare your KG data** in the required format (see above)
+2. **Start the KG server** with your data directory:
+
+```bash
+# Your KG data should be organized as:
+# your_kg_data/
+# ├── entities.json
+# ├── relations.json  
+# ├── train_simple.json
+# └── test_simple.json
+
+python kg_r1/search/server.py --port 8001 --data_dir your_kg_data
+```
+
+3. **Configure your training script** to point to your KG server:
+
+```bash
+# In your training script, update:
+actor_rollout_ref.rollout.search.search_url="http://127.0.0.1:8001/retrieve"
+```
+
+The KG server supports the 4 basic operations:
+- `get_tail_relations(entity)`: Find relations where entity is the subject
+- `get_head_relations(entity)`: Find relations where entity is the object
+- `get_tail_entities(entity, relation)`: Get tail entities for head-relation pairs
+- `get_head_entities(entity, relation)`: Get head entities for relation-tail pairs
+
+## Use your own knowledge graph
+
+KG-R1 supports different types of knowledge graphs with a schema-agnostic design. The system works with:
+- **Freebase-style KGs**: Entity-centric with rich relations
+- **Wikidata KGs**: Property-based knowledge representation
+- **Temporal KGs**: Time-aware knowledge graphs
+- **Domain-specific KGs**: Custom knowledge graphs for specific domains
+
+The main philosophy is to launch a KG server separately from the RL training pipeline, providing a clean API interface.
+
+The LLM agent calls the KG server through the search API at `http://127.0.0.1:8001/retrieve`.
+
+### KG Server Implementation
+You can refer to `kg_r1/search/server.py` for the complete KG server implementation, which includes:
+- **FastAPI server**: RESTful API for KG operations
+- **Concurrent processing**: ThreadPoolExecutor for handling multiple requests
+- **Action routing**: Dispatches requests to appropriate KG operations
+- **Error handling**: Robust error handling for malformed queries
+
+### Cross-KG Transfer
+KG-R1's key advantage is cross-KG transferability. Models trained on one KG can transfer to different KG schemas without retraining, making it truly plug-and-play.
+
+## Features
+- **Single-agent architecture**: Unified reasoning and retrieval in one LLM. ✔️
+- **Schema-agnostic KG operations**: Works across different KG schemas. ✔️
+- **Cross-KG transferability**: Plug-and-play capability across knowledge graphs. ✔️
+- **Multi-turn KG reasoning**: Up to 7 turns of iterative knowledge exploration. ✔️
+- **GRPO training**: Group Relative Policy Optimization for stable learning. ✔️
+- **Efficient KG server**: FastAPI-based server with concurrent processing. ✔️
+- **LLM-as-judge evaluation**: Semantic factuality assessment beyond exact matching. ✔️
+- **Support different LLMs**: Qwen2.5, Llama3, and other transformer models. ✔️
+- **VLLM integration**: Efficient inference backend with batching optimization. ✔️
+
+## Acknowledge
+
+KG-R1 builds upon the foundation established by [Search-R1](https://github.com/PeterGriffinJin/Search-R1), extending the reasoning-and-searching paradigm to knowledge graphs.
+The implementation is built upon [veRL](https://github.com/volcengine/verl) for reinforcement learning and integrates ideas from [RAGEN](https://github.com/ZihanWang314/RAGEN/tree/main) for knowledge graph reasoning.
+We acknowledge the contributions of [Deepseek-R1](https://github.com/deepseek-ai/DeepSeek-R1) and [TinyZero](https://github.com/Jiayi-Pan/TinyZero/tree/main) for inspiring the RL-based reasoning approaches.
+We sincerely appreciate the efforts of these teams for their contributions to open-source research and development.
+
+## Related work in KG-RAG and Agentic Reasoning
+
+### Knowledge Graph Reasoning
+- **Search-R1**: The foundation framework for reasoning-and-searching interleaved LLMs
+- **RAGEN**: Retrieval-Augmented Generation with knowledge graphs
+- **RoG (Reasoning on Graphs)**: Planning-based knowledge graph reasoning
+- **KG-RAG**: Traditional multi-module KG-RAG pipelines
+
+### Agentic RAG Systems  
+- [DeepResearcher](https://github.com/GAIR-NLP/DeepResearcher): Scaling Deep Research via Reinforcement Learning in Real-world Environments. [![[code]](https://img.shields.io/github/stars/GAIR-NLP/DeepResearcher)](https://github.com/GAIR-NLP/DeepResearcher)
+- [IKEA](https://github.com/hzy312/knowledge-r1): Reinforced Internal-External Knowledge Synergistic Reasoning for Efficient Adaptive Search Agent. [![[code]](https://img.shields.io/github/stars/hzy312/knowledge-r1)](https://github.com/hzy312/knowledge-r1)
+- [OTC](https://arxiv.org/pdf/2504.14870): Optimal Tool Calls via Reinforcement Learning.
+
+### RL-based Reasoning Extensions
+- [Multimodal-Search-R1](https://github.com/EvolvingLMMs-Lab/multimodal-search-r1): Incentivizing LMMs to Search. [![[code]](https://img.shields.io/github/stars/EvolvingLMMs-Lab/multimodal-search-r1)](https://github.com/EvolvingLMMs-Lab/multimodal-search-r1)
+- [ZeroSearch](https://github.com/Alibaba-NLP/ZeroSearch): Incentivize the Search Capability of LLMs without Searching. [![[code]](https://img.shields.io/github/stars/Alibaba-NLP/ZeroSearch)](https://github.com/Alibaba-NLP/ZeroSearch)
+- [AutoRefine](https://www.arxiv.org/pdf/2505.11277): Search and Refine During Think. [![[code]](https://img.shields.io/github/stars/syr-cn/AutoRefine)](https://github.com/syr-cn/AutoRefine)
+- [R1-Code-Interpreter](https://arxiv.org/abs/2505.21668): Training LLMs to Reason with Code via SFT and RL. [![[code]](https://img.shields.io/github/stars/yongchao98/R1-Code-Interpreter)](https://github.com/yongchao98/R1-Code-Interpreter)
+
+## Citations
+
+If you use KG-R1 in your research, please cite:
 
 ```bibtex
-@inproceedings{kg-r1-2026,
-  title={KG-R1: Efficient and Transferable Agentic KG-RAG via Reinforcement Learning},
+@article{kg_r1_2025,
+  title={KG-R1: Efficient and Transferable Agentic KG-RAG via RL},
   author={[Authors]},
-  booktitle={International Conference on Learning Representations (ICLR)},
-  year={2026}
+  journal={arXiv preprint arXiv:[ARXIV_ID]},
+  year={2025}
 }
 ```
 
-## 🤝 Contributing
+Please also cite the foundational Search-R1 framework:
 
-We welcome contributions! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
+```bibtex
+@article{jin2025search,
+  title={Search-r1: Training llms to reason and leverage search engines with reinforcement learning},
+  author={Jin, Bowen and Zeng, Hansi and Yue, Zhenrui and Yoon, Jinsung and Arik, Sercan and Wang, Dong and Zamani, Hamed and Han, Jiawei},
+  journal={arXiv preprint arXiv:2503.09516},
+  year={2025}
+}
+```
 
-## 📄 License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-KG-R1 builds upon several excellent open-source projects:
-- [veRL](https://github.com/volcengine/verl) - Reinforcement learning framework
-- [vLLM](https://github.com/vllm-project/vllm) - Efficient LLM inference
-- [DeepSeek-R1](https://github.com/deepseek-ai/DeepSeek-R1) - Multi-turn reasoning inspiration
-
----
-
-For detailed documentation and advanced usage examples, visit our [documentation](docs/).
+```bibtex
+@article{jin2025empirical,
+  title={An Empirical Study on Reinforcement Learning for Reasoning-Search Interleaved LLM Agents},
+  author={Jin, Bowen and Yoon, Jinsung and Kargupta, Priyanka and Arik, Sercan O and Han, Jiawei},
+  journal={arXiv preprint arXiv:2505.15117},
+  year={2025}
+}
+```

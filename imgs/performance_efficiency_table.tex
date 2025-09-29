@@ -1,0 +1,47 @@
+\begin{table}[!t]
+\centering
+\caption{Performance and efficiency comparison of KGQA methods on WebQSP and CWQ datasets. 
+%All metrics are reported on the test split. Bold values indicate the best performance across methods (except \texttt{KG-R1} 3 runs) 
+The max turn number set to $H=5$. All scores are percentages.}
+\label{tab:webqsp_cwq_performance_efficiency_comparison_colored}
+\footnotesize
+\begin{adjustbox}{width=\textwidth}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{ll|c|cc|cc|cc|cc}
+\toprule
+\multirow{3}{*}{Method} & \multirow{3}{*}{Model} & \multirow{3}{*}{Modules} & \multicolumn{4}{c|}{WebQSP} & \multicolumn{4}{c}{CWQ} \\
+\cmidrule(lr){4-7}\cmidrule(lr){8-11}
+ &  &  & \multicolumn{2}{c|}{Performance} & \multicolumn{2}{c|}{Efficiency} & \multicolumn{2}{c|}{Performance} & \multicolumn{2}{c}{Efficiency} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}
+ & & & \footnotesize{F1} & \footnotesize{Hit@1} & \footnotesize{Total} & \footnotesize{Gen} & \footnotesize{F1} & \footnotesize{Hit@1} & \footnotesize{Total} & \footnotesize{Gen} \\
+\midrule
+\headerrow
+\multicolumn{11}{c}{\textit{LLM-only Methods}} \\
+\addlinespace[1pt]
+Vanilla & Qwen2.5-3B-it & 1 & 29.4 & 46.6 & 95 & 30  & 16.6 & 21.1 & 104 & 42 \\
+Vanilla & Qwen2.5-7B-it & 1 & 33.2 & 50.9 & 95 & 67  & 20.7 & 25.7 & 104 & 92 \\
+Vanilla & LLaMA2-7B-it   & 1 & 37.4 & 54.5 & 114 & 255 & 20.7 & 24.8 & 123 & 255 \\
+COT     & Qwen2.5-3B-it & 1 & 30.6 & 47.6 & 131 & 192 & 17.3 & 21.4 & 140 & 216 \\
+COT     & Qwen2.5-7B-it & 1 & 35.3 & 53.5 & 131 & 194 & 22.5 & 27.1 & 140 & 212 \\
+COT     & LLaMA2-7B-it   & 1 & 33.8 & 51.6 & 165 & 255 & 19.0 & 23.1 & 174 & 255 \\
+\addlinespace[2pt]
+\headerrow
+\multicolumn{11}{c}{\textit{LLM+KG Methods}} \\
+\addlinespace[1pt]
+RoG      & LLaMA2-7B-it   & 2 & 70.8 & \textbf{85.7} & 1.2K & 295 & 56.2 & 62.6 & 1.1K & 266 \\
+ToG      & GPT-3.5        & 4 & 72.8 & 76.2 & 3.5K & 529 & 52.9 & 57.1 & 3.7K & 520 \\
+ToG 2.0  & GPT-3.5        & 5 & 74.5 & 77.8 & 39.K & 605 & 65.8 & 68.9 & 3.8K & 650 \\
+ReKnoS   & GPT-4o-mini    & 3 & 73.7 & 81.1 & 3.1K & 617 & 64.7 & 66.8 & 4.1K & 752 \\
+\addlinespace[2pt]
+\headerrow
+\multicolumn{11}{c}{\textit{KG-R1 (Our Methods)}} \\
+\addlinespace[1pt]
+\oursrow
+\textbf{KG-R1 (1 run)} & Qwen2.5-3B-it & 1 & \textbf{77.5} & 84.7 & 3.2K & 302 & \textbf{70.9} & \textbf{73.8} & 3.3K & 377 \\
+\oursrow
+\textbf{KG-R1 (3 runs)} & Qwen2.5-3B-it & 1 & 85.8 & 91.7 & 9.7K & 906 & 81.0 & 83.9 & 10.0K & 1.1K \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\vspace{-.2in}
+\end{table}
