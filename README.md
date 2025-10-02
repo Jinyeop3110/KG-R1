@@ -2,7 +2,7 @@
 
 ## Latest Update - ICLR 2026 Submission
 
-**📄 Paper Submitted**: KG-R1 methodology submitted to ICLR 2026 - [KG-R1: Efficient and Transferable Agentic KG-RAG via RL](https://arxiv.org/abs/PLACEHOLDER).
+**📄 Preprint**: - [KG-R1: Efficient and Transferable Agentic KG-RAG via RL](https://arxiv.org/pdf/2509.26383v1).
 
 **🔬 Key Innovation - Single-Agent KG Reasoning**:
 1. ✅ **Single-Agent Architecture**: Replaces complex multi-module workflows with unified LLM agent
