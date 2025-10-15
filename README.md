@@ -1,8 +1,6 @@
 # KG-R1: Efficient and Transferable Knowledge Graph-Augmented Reinforcement Learning
 
-## Latest Update - ICLR 2026 Submission
-
-**📄 Paper Submitted**: KG-R1 methodology submitted to ICLR 2026 - [KG-R1: Efficient and Transferable Agentic KG-RAG via RL](https://arxiv.org/abs/PLACEHOLDER).
+**📄 Preprint**: - [KG-R1: Efficient and Transferable Agentic KG-RAG via RL](https://arxiv.org/pdf/2509.26383v1).
 
 **🔬 Key Innovation - Single-Agent KG Reasoning**:
 1. ✅ **Single-Agent Architecture**: Replaces complex multi-module workflows with unified LLM agent
@@ -12,7 +10,7 @@
 5. ✅ **GRPO Training**: Group Relative Policy Optimization for stable multi-turn learning
 
 **⚡ System Architecture**:
-- **KG Server**: 4 basic operations (get_tail_relations, get_head_relations, get_tail_entities, get_head_entities)
+- **KG Retreival Server**: 4 basic operations (get_tail_relations, get_head_relations, get_tail_entities, get_head_entities)
 - **Single Agent**: Unified reasoning and retrieval in one LLM with special tokens
 - **Multi-turn Interaction**: Up to 7 turns of KG exploration per question
 - **Lightweight Design**: No separate retriever, reranker, or planning modules
@@ -379,26 +377,6 @@ If you use KG-R1 in your research, please cite:
   title={KG-R1: Efficient and Transferable Agentic KG-RAG via RL},
   author={[Authors]},
   journal={arXiv preprint arXiv:[ARXIV_ID]},
-  year={2025}
-}
-```
-
-Please also cite the foundational Search-R1 framework:
-
-```bibtex
-@article{jin2025search,
-  title={Search-r1: Training llms to reason and leverage search engines with reinforcement learning},
-  author={Jin, Bowen and Zeng, Hansi and Yue, Zhenrui and Yoon, Jinsung and Arik, Sercan and Wang, Dong and Zamani, Hamed and Han, Jiawei},
-  journal={arXiv preprint arXiv:2503.09516},
-  year={2025}
-}
-```
-
-```bibtex
-@article{jin2025empirical,
-  title={An Empirical Study on Reinforcement Learning for Reasoning-Search Interleaved LLM Agents},
-  author={Jin, Bowen and Yoon, Jinsung and Kargupta, Priyanka and Arik, Sercan O and Han, Jiawei},
-  journal={arXiv preprint arXiv:2505.15117},
   year={2025}
 }
 ```
