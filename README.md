@@ -163,39 +163,158 @@ pip install numpy scipy
 
 Train a KG-R1 agent on ComplexWebQuestions (CWQ) dataset using GRPO (Group Relative Policy Optimization). See [Figure 2](imgs/fig2.png) for the multi-turn interaction process.
 
-### 🚀 **4-Step Setup**
+### Part 1: Initialize
 
-**(1) Download and prepare KG-QA datasets**
+**Set up conda environment and download datasets**
+
+**(1) Create and activate the KG-R1 environment**
 ```bash
-# Download CWQ and WebQSP datasets with pre-computed knowledge subgraphs
-python scripts/data_kg/setup_datasets.py --save_path data_kg
+conda create -n kgr1 python=3.9
+conda activate kgr1
 
-# This creates:
-# data_kg/cwq_search_augmented_initial_entities/
-# data_kg/webqsp_search_augmented_initial_entities/
+# Install PyTorch with CUDA support
+pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+
+# Install vLLM for efficient inference
+pip3 install vllm==0.6.3
+
+# Install veRL framework
+pip install -e .
+
+# Install flash attention for efficient training
+pip3 install flash-attn --no-build-isolation
+pip install wandb
+
+# Additional dependencies for KG processing
+pip install fastapi uvicorn requests aiohttp networkx
 ```
 
-**(2) Launch the KG retrieval server**
+**(2) Initialize datasets using `initialize.py`**
+```bash
+# This script downloads and prepares KG-QA datasets
+python initialize.py
+
+# This creates the data_kg/ directory with:
+# - CWQ: ComplexWebQuestions dataset with Freebase knowledge subgraphs
+# - WebQSP: WebQuestionsSP dataset with Freebase knowledge subgraphs
+# - Search-augmented initial entities for both datasets
+```
+
+The `data_kg/` directory structure after initialization:
+```
+data_kg/
+├── CWQ/                                          # CWQ dataset files
+│   ├── entities.txt, relations.txt              # KG vocabulary
+│   ├── train_simple.json, dev_simple.json       # QA pairs
+│   └── word_emb_300d.npy                        # Entity embeddings
+├── cwq_search_augmented_initial_entities/       # Processed CWQ data
+│   ├── train.parquet, dev.parquet, test.parquet
+├── webqsp/                                      # WebQSP dataset files
+│   ├── entities.txt, relations.txt
+│   ├── train_simple.json, test_simple.json
+│   └── word_emb_300d.npy
+└── webqsp_search_augmented_initial_entities/    # Processed WebQSP data
+    ├── train.parquet, test.parquet
+```
+
+**(3) Create KG server environment (optional but recommended)**
+```bash
+conda create -n kg_server python=3.10
+conda activate kg_server
+
+# Core dependencies for KG server
+pip install fastapi uvicorn pydantic requests
+pip install transformers datasets huggingface_hub
+pip install networkx pandas pyarrow numpy scipy
+```
+
+### Part 2: Training
+
+**Train KG-R1 agent using reinforcement learning**
+
+**(1) Launch the KG retrieval server**
 ```bash
 conda activate kg_server
 # Start KG server on port 8001 (provides 4 basic KG operations)
 python kg_r1/search/server.py --port 8001 --data_dir data_kg
 ```
 
-**(3) Run KG-R1 training with GRPO**
+**(2) Run KG-R1 training with GRPO**
 ```bash
 conda activate kgr1
-# Train Qwen2.5-3B with 7-turn KG reasoning (see Figure 1 for architecture)
+# Train Qwen2.5-3B with 7-turn KG reasoning on CWQ
 bash train_grpo_kg_qwen_3b_cwq_f1_turn7.sh
+
+# Or train on WebQSP:
+# bash train_grpo_kg_qwen_3b_webqsp_f1_turn7.sh
 ```
 
-**(4) Evaluate the trained model**
+**Training configurations available:**
+- `train_grpo_kg_qwen_3b_cwq_f1_turn5.sh` - CWQ with 5 turns
+- `train_grpo_kg_qwen_3b_cwq_f1_turn7.sh` - CWQ with 7 turns (recommended)
+- `train_grpo_kg_qwen_3b_webqsp_f1_turn7.sh` - WebQSP with 7 turns
+
+**Expected training time:** ~8-12 hours on 4x A100 GPUs for full training
+
+**Expected Results:** 70.9 F1 / 73.8 Hit@1 on CWQ with single 3B model (see [Performance Results](#performance-results))
+
+### Part 3: Inference
+
+**Two inference options: (1) Local checkpoint or (2) HuggingFace models**
+
+#### Option 1: Local Checkpoint Inference
+
+Evaluate your locally trained model:
+
 ```bash
-# Run evaluation with Pass@K metrics and LLM-as-judge
-bash eval_scripts/kg_r1_eval_main/eval_qwen_3b_cwq_f1_turn7.sh
+# (1) Launch the KG retrieval server
+conda activate kg_server
+python kg_r1/search/server.py --port 8001 --data_dir data_kg
+
+# (2) Run inference with your trained checkpoint
+conda activate kgr1
+bash eval_scripts/kg_r1_eval_main/eval_qwen_3b_cwq_f1_turn7_local.sh \
+    /path/to/your/checkpoint \
+    cwq  # or webqsp
+
+# Example:
+# bash eval_scripts/kg_r1_eval_main/eval_qwen_3b_cwq_f1_turn7_local.sh \
+#     verl_checkpoints/cwq-KG-r1-grpo-qwen2.5-3b-it_f1_turn7 \
+#     cwq
 ```
 
-**Expected Results**: 70.9 F1 / 73.8 Hit@1 on CWQ with single 3B model (see [Performance Results](#performance-results))
+#### Option 2: HuggingFace Model Inference
+
+Evaluate pre-trained models directly from HuggingFace (no local training needed):
+
+```bash
+# (1) Launch the KG retrieval server
+conda activate kg_server
+python kg_r1/search/server.py --port 8001 --data_dir data_kg
+
+# (2) Run inference with HuggingFace model
+conda activate kgr1
+bash eval_scripts/kg_r1_eval_main/eval_qwen_3b_cwq_f1_turn7_hf.sh \
+    JinyeopSong/KG-R1_test \  # Specify HF model
+    cwq                        # Dataset to evaluate
+
+# Or simply use defaults:
+# bash eval_scripts/kg_r1_eval_main/eval_qwen_3b_cwq_f1_turn7_hf.sh
+```
+
+**Available Evaluation Scripts:**
+- `eval_qwen_3b_cwq_f1_turn7_local.sh` - Evaluate local checkpoint
+- `eval_qwen_3b_cwq_f1_turn7_hf.sh` - Evaluate HuggingFace model
+
+**Available HuggingFace Models:**
+- `JinyeopSong/KG-R1_test` - Testing model (placeholder)
+- More models coming soon! (Links not ready yet)
+
+**Inference outputs:**
+- Pass@K evaluation results (K=1,2,3,4)
+- Detailed reasoning traces with KG exploration steps
+- Exact match and F1 scores
+- Per-sample analysis in JSONL format
 
 ## KG-R1 Results
 

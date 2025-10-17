@@ -50,11 +50,17 @@ def kg_retrieval_completion_response(content: str, action_type: str, is_error: b
 
 class ActionType(str, Enum):
     """Action types for MultiTQ KG retrieval."""
-    GET_HEAD_RELATIONS = "get_head_relations"
-    GET_TAIL_RELATIONS = "get_tail_relations"
-    GET_HEAD_ENTITIES = "get_head_entities"
-    GET_TAIL_ENTITIES = "get_tail_entities"
-    # Removed temporal-specific actions as requested
+    # New intuitive naming scheme
+    GET_RELATIONS_IN = "get_relations_in"  # Incoming: ? → rel → entity
+    GET_RELATIONS_OUT = "get_relations_out"  # Outgoing: entity → rel → ?
+    GET_ENTITIES_IN = "get_entities_in"  # Get entities incoming via relation
+    GET_ENTITIES_OUT = "get_entities_out"  # Get entities outgoing via relation
+
+    # Legacy aliases for backward compatibility
+    GET_HEAD_RELATIONS = "get_relations_in"
+    GET_TAIL_RELATIONS = "get_relations_out"
+    GET_HEAD_ENTITIES = "get_entities_in"
+    GET_TAIL_ENTITIES = "get_entities_out"
 
 
 class SearchRequest(BaseModel):

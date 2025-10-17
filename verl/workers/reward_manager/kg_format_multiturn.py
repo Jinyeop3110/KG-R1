@@ -1017,20 +1017,10 @@ class KGFormatMultiTurnRewardManager(KGFormatRewardManager):
             dataset_type = 'MultiTQ'
             data_source = 'multitq'  # Update for consistency
         
-        # Always show logging for all KG evaluation examples
-        print(f"[{dataset_type}-EVAL] ===== ANSWER EXTRACTION EXAMPLE =====")
-        print(f"[{dataset_type}-EVAL] Question asked: {interaction_history.get('original_query', 'N/A')}")
-        print(f"[{dataset_type}-EVAL] Extracted answer: '{predicted_answer}'")
-        print(f"[{dataset_type}-EVAL] Ground truth answers: {ground_truth_answers}")
-        # Calculate EM score for display
+        # Calculate EM score for display (no logging)
         # Pass interaction_history to enable MultiTQ temporal granularity handling
-        print(f"[DEBUG-EM] Calling _check_exact_match with dataset_name='{data_source}', ground_truth={ground_truth_answers}")
         em_match_result = self._check_exact_match(predicted_answer, ground_truth_answers, interaction_history=interaction_history, dataset_name=data_source)
         em_score = 1.0 if em_match_result else 0.0
-        print(f"[DEBUG-EM] _check_exact_match returned: {em_match_result}, EM score: {em_score}")
-        print(f"[{dataset_type}-EVAL] EM Score: {em_score}")
-        print(f"[{dataset_type}-EVAL] Has answer tags: {predicted_answer is not None}")
-        print(f"[{dataset_type}-EVAL] ===============================================")
         
         # Token-level enhanced metrics removed - using entity-level calculations only
         
@@ -1173,30 +1163,37 @@ class KGFormatMultiTurnRewardManager(KGFormatRewardManager):
     def _calculate_entity_level_f1_precision_recall(self, predicted_answer: str, ground_truth_raw) -> Dict[str, float]:
         """
         Calculate entity-level F1, precision, and recall for multi-entity answers.
-        
+
         This method properly handles cases where ground truth contains multiple distinct entities,
-        not just different representations of the same entity.
-        
+        using set-based comparison after parsing comma-separated predictions.
+
         Args:
-            predicted_answer: The extracted predicted answer
+            predicted_answer: The extracted predicted answer (possibly comma-separated)
             ground_truth_raw: Raw ground truth data (can be dict with target_text and target_kb_id lists)
-            
+
         Returns:
             Dict with f1, precision, and recall scores
         """
         if not predicted_answer:
             return {'f1': 0.0, 'precision': 0.0, 'recall': 0.0}
-        
-        # Normalize predicted answer
-        normalized_predicted = normalize_answer(predicted_answer)
-        if not normalized_predicted:
+
+        # Parse predicted answer into individual entities (split by comma)
+        predicted_entities = [e.strip() for e in predicted_answer.split(',')]
+        predicted_normalized_set = set()
+        for pred_entity in predicted_entities:
+            if pred_entity:
+                normalized = normalize_answer(pred_entity)
+                if normalized:
+                    predicted_normalized_set.add(normalized)
+
+        if not predicted_normalized_set:
             return {'f1': 0.0, 'precision': 0.0, 'recall': 0.0}
-        
+
         # Parse ground truth structure
         if isinstance(ground_truth_raw, dict):
             target_texts = ground_truth_raw.get("target_text", [])
             target_kb_ids = ground_truth_raw.get("target_kb_id", [])
-            
+
             # Ensure both are lists
             if not isinstance(target_texts, list):
                 target_texts = [target_texts] if target_texts else []
@@ -1210,77 +1207,75 @@ class KGFormatMultiTurnRewardManager(KGFormatRewardManager):
                 ground_truth_answers = ground_truth_raw
             else:
                 ground_truth_answers = [str(ground_truth_raw)]
-            # Legacy fallback for non-dict ground truth (backward compatibility)
-            normalized_predicted = normalize_answer(predicted_answer)
+
+            # Parse ground truth into set
             normalized_gt_entities = set()
             for gt_answer in ground_truth_answers:
                 if gt_answer:
                     normalized_gt = normalize_answer(gt_answer)
                     if normalized_gt:
                         normalized_gt_entities.add(normalized_gt)
-            
-            if not normalized_predicted and not normalized_gt_entities:
+
+            if not predicted_normalized_set and not normalized_gt_entities:
                 return {'f1': 1.0, 'precision': 1.0, 'recall': 1.0}
-            elif not normalized_predicted:
+            elif not predicted_normalized_set:
                 return {'f1': 0.0, 'precision': 0.0, 'recall': 0.0}
             elif not normalized_gt_entities:
                 return {'f1': 0.0, 'precision': 0.0, 'recall': 1.0}
-            
-            gt_entity_found = any(gt_entity in normalized_predicted for gt_entity in normalized_gt_entities)
-            if gt_entity_found:
-                precision = 1.0
-                recall = 1.0  # Legacy behavior: all variants = same entity
-            else:
-                precision = 0.0
-                recall = 0.0
-            
+
+            # Set-based comparison
+            correct_entities = predicted_normalized_set & normalized_gt_entities
+            num_correct = len(correct_entities)
+            num_predicted = len(predicted_normalized_set)
+            num_ground_truth = len(normalized_gt_entities)
+
+            precision = num_correct / num_predicted if num_predicted > 0 else 0.0
+            recall = num_correct / num_ground_truth if num_ground_truth > 0 else 0.0
+
             if precision + recall == 0:
                 f1 = 0.0
             else:
                 f1 = 2 * (precision * recall) / (precision + recall)
-            
+
             return {'f1': f1, 'precision': precision, 'recall': recall}
-        
-        # Build list of distinct entities (each index represents a different entity)
+
+        # Build normalized ground truth entity set
+        # For dict-based ground truth, each index is a distinct entity with possible text/kb_id variants
         num_entities = max(len(target_texts), len(target_kb_ids))
         if num_entities == 0:
             return {'f1': 0.0, 'precision': 0.0, 'recall': 1.0}
-        
-        entities_found = []
-        
+
+        # Build a set of all valid ground truth representations
+        ground_truth_normalized_set = set()
         for i in range(num_entities):
-            # For each entity, check if either its text form OR kb_id form is in the prediction
-            entity_matched = False
-            
-            # Check text form
+            # Add text form
             if i < len(target_texts) and target_texts[i]:
                 normalized_text = normalize_answer(str(target_texts[i]))
-                if normalized_text and normalized_text in normalized_predicted:
-                    entity_matched = True
-            
-            # Check kb_id form  
-            if not entity_matched and i < len(target_kb_ids) and target_kb_ids[i]:
+                if normalized_text:
+                    ground_truth_normalized_set.add(normalized_text)
+
+            # Add kb_id form
+            if i < len(target_kb_ids) and target_kb_ids[i]:
                 normalized_kb = normalize_answer(str(target_kb_ids[i]))
-                if normalized_kb and normalized_kb in normalized_predicted:
-                    entity_matched = True
-            
-            entities_found.append(entity_matched)
-        
-        # Count how many distinct entities were found
-        num_found = sum(entities_found)
-        
-        # For precision: assume all found entities are correct (containment-based)
-        precision = 1.0 if num_found > 0 else 0.0
-        
-        # For recall: what fraction of all distinct entities did we find?
-        recall = num_found / num_entities
-        
+                if normalized_kb:
+                    ground_truth_normalized_set.add(normalized_kb)
+
+        # Set-based comparison: find intersection
+        correct_entities = predicted_normalized_set & ground_truth_normalized_set
+        num_correct = len(correct_entities)
+        num_predicted = len(predicted_normalized_set)
+        num_ground_truth = len(ground_truth_normalized_set)
+
+        # Calculate proper set-based metrics
+        precision = num_correct / num_predicted if num_predicted > 0 else 0.0
+        recall = num_correct / num_ground_truth if num_ground_truth > 0 else 0.0
+
         # Calculate F1
         if precision + recall == 0:
             f1 = 0.0
         else:
             f1 = 2 * (precision * recall) / (precision + recall)
-        
+
         return {
             'f1': f1,
             'precision': precision,
@@ -1488,71 +1483,71 @@ class KGFormatMultiTurnRewardManager(KGFormatRewardManager):
             print(f"[sequences] {sequences_str}")
             print()
             print(f"[ground_truth] {ground_truth}")
-            
+
             # Print turn-wise rewards
             self._log_turn_rewards(reward_dict)
-            
-            # Print global rewards  
+
+            # Print global rewards
             self._log_global_rewards(reward_dict, data_item)
-            
+
             # Print final score calculation
             self._log_final_score_calculation(reward_dict)
             print(f"{'='*80}\n")
-    
+
     def _log_turn_rewards(self, reward_dict: Dict):
         """Log turn-wise rewards with complete calculation flow demonstration."""
         turn_rewards = reward_dict.get('turn_rewards', {})
         turn_components = reward_dict.get('turn_components', {})
-        
+
         if not turn_rewards:
             return
-            
+
         print("\n[turn_rewards]")
         for turn_num in sorted(turn_rewards.keys()):
             turn_reward = turn_rewards[turn_num]
             components = turn_components.get(turn_num, {})
-            
+
             # Extract raw component scores (before weight application)
             kg_validity_raw = components.get('kg_query_validity', 0.0)
-            answer_validity_raw = components.get('is_answer_score', 0.0) 
+            answer_validity_raw = components.get('is_answer_score', 0.0)
             format_score_raw = components.get('format_score', 0.0)
             action_type = components.get('action', 'unknown')
             extracted_content = components.get('extracted_content', '')
-            
+
             # Show the complete calculation flow with weights
             print(f"  Turn {turn_num} ({action_type}):")
-            
+
             # Step 1: Show raw component scores
             print(f"    [raw_components] format={format_score_raw:.1f}, kg_validity={kg_validity_raw:.1f}, answer_validity={answer_validity_raw:.1f}")
-            
+
             # Step 2: Show weight application
             format_weight = self.turn_specific_weights['format_score']
-            kg_weight = self.turn_specific_weights['kg_query_validity'] 
+            kg_weight = self.turn_specific_weights['kg_query_validity']
             answer_weight = self.turn_specific_weights['is_answer_score']
-            
+
             format_weighted = format_score_raw * format_weight
             kg_weighted = kg_validity_raw * kg_weight
             answer_weighted = answer_validity_raw * answer_weight
-            
+
             print(f"    [weights] format={format_weight}, kg_validity={kg_weight}, answer_validity={answer_weight}")
             print(f"    [weighted_scores] format={format_weighted:.3f}, kg_validity={kg_weighted:.3f}, answer_validity={answer_weighted:.3f}")
-            
+
             # Step 3: Show final calculation based on action type
             if action_type == 'kg-query':
                 calculated_total = format_weighted + kg_weighted
                 print(f"    [calculation] {format_weighted:.3f} + {kg_weighted:.3f} = {calculated_total:.3f}")
             elif action_type == 'answer':
-                calculated_total = format_weighted + answer_weighted  
+                calculated_total = format_weighted + answer_weighted
                 print(f"    [calculation] {format_weighted:.3f} + {answer_weighted:.3f} = {calculated_total:.3f}")
             else:
                 calculated_total = 0.0
                 print(f"    [calculation] unknown_action = {calculated_total:.3f}")
-            
+
             # Step 4: Validation
             calculation_correct = abs(turn_reward - calculated_total) < 0.001
             status = "✅ CORRECT" if calculation_correct else "❌ INCORRECT"
             print(f"    [final] expected={calculated_total:.3f}, actual={turn_reward:.3f} {status}")
-            
+
             # Step 5: Format validation for debugging
             if extracted_content:
                 import re
@@ -1568,33 +1563,33 @@ class KGFormatMultiTurnRewardManager(KGFormatRewardManager):
                     expected_format_raw = 1.0 if (has_think and has_answer) else 0.0
                     format_validation = "✅" if abs(format_score_raw - expected_format_raw) < 0.001 else "❌"
                     print(f"    [format_check] has_think={has_think}, has_answer={has_answer}, expected={expected_format_raw:.1f}, actual={format_score_raw:.1f} {format_validation}")
-            
+
             # Step 6: Show content for debugging if needed
             should_show_content = (
-                not calculation_correct or 
-                format_score_raw == 0.0 or 
+                not calculation_correct or
+                format_score_raw == 0.0 or
                 self.show_full_responses
             )
-            
+
             if should_show_content and extracted_content:
                 content_preview = extracted_content[:500] + ('...' if len(extracted_content) > 500 else '')
                 print(f"    [extracted_content] {content_preview}")
-            
+
             print()  # Add spacing between turns
-    
+
     def _log_global_rewards(self, reward_dict: Dict, data_item=None):
         """Log global rewards with complete calculation flow demonstration."""
         global_rewards = reward_dict.get('global_rewards', {})
-        
+
         if not global_rewards:
             return
-            
+
         print("\n[global_rewards]")
-        
+
         # Show the calculation flow for global rewards - use actual raw scores
         exact_match_raw = global_rewards.get('_raw_exact_match', 0.0)
         retrieval_quality_raw = global_rewards.get('_raw_retrieval_quality', 0.0)
-        
+
         # Show both exact match binary and F1 scores if available
         if data_item and hasattr(data_item, 'answer_metrics'):
             exact_match_binary = data_item.answer_metrics.get('exact_match_binary', 0.0)
@@ -1602,29 +1597,29 @@ class KGFormatMultiTurnRewardManager(KGFormatRewardManager):
             print(f"  [raw_components] exact_match={exact_match_raw:.3f} (binary={exact_match_binary:.3f}, f1={f1_score:.3f}), retrieval_quality={retrieval_quality_raw:.3f}")
         else:
             print(f"  [raw_components] exact_match={exact_match_raw:.3f}, retrieval_quality={retrieval_quality_raw:.3f}")
-        
+
         # Show OTC scaling information if enabled
         otc_scaling_factor = global_rewards.get('_otc_scaling_factor', 1.0)
         kg_turns_used = global_rewards.get('_kg_turns_used', 0)
-        
+
         if self.otc_scaling:
             print(f"  [otc_scaling] kg_turns_used={kg_turns_used}, max_turns={self.max_turns}, scaling_factor={otc_scaling_factor:.3f}")
             print(f"  [scaled_components] exact_match={exact_match_raw * otc_scaling_factor:.3f}, retrieval_quality={retrieval_quality_raw * otc_scaling_factor:.3f}")
-        
+
         # Show weights
         em_weight = self.global_weights['exact_match']
         rq_weight = self.global_weights['retrieval_quality']
-        
+
         # Use actual weighted scores from the reward calculation
         em_weighted = global_rewards.get('exact_match', 0.0)
         rq_weighted = global_rewards.get('retrieval_quality', 0.0)
         total_global = em_weighted + rq_weighted
-        
+
         # Include OTC scaling in weights display
         otc_weight = otc_scaling_factor if self.otc_scaling else 1.0
         print(f"  [weights] exact_match={em_weight}, retrieval_quality={rq_weight}, otc_scaling={otc_weight:.3f}")
         print(f"  [weighted_scores] exact_match={em_weighted:.3f}, retrieval_quality={rq_weighted:.3f}")
-        
+
         # Show calculation with OTC scaling notation if enabled
         if self.otc_scaling and otc_scaling_factor != 1.0:
             # Calculate what the base weighted values would be without OTC scaling
@@ -1635,27 +1630,26 @@ class KGFormatMultiTurnRewardManager(KGFormatRewardManager):
         else:
             print(f"  [calculation] {em_weighted:.3f} + {rq_weighted:.3f} = {total_global:.3f}")
         print(f"  [total_global] {total_global:.3f}")
-    
+
     def _log_final_score_calculation(self, reward_dict: Dict):
         """Log the final total score calculation with validation."""
         turn_rewards = reward_dict.get('turn_rewards', {})
         global_rewards = reward_dict.get('global_rewards', {})
         total_score = reward_dict.get('total_score', 0.0)
-        
+
         # Calculate expected totals (must match the actual calculation method)
         total_turn_score = sum(turn_rewards.values()) / len(turn_rewards) if turn_rewards else 0.0
         total_global_score = sum(v for k, v in global_rewards.items() if not k.startswith('_'))
         expected_total = total_turn_score + total_global_score
-        
+
         # Validation
         calculation_correct = abs(total_score - expected_total) < 0.001
         status = "✅ CORRECT" if calculation_correct else "❌ INCORRECT"
-        
+
         print(f"\n[final_calculation]")
         print(f"  [components] turn_total={total_turn_score:.3f}, global_total={total_global_score:.3f}")
         print(f"  [calculation] {total_turn_score:.3f} + {total_global_score:.3f} = {expected_total:.3f}")
         print(f"  [final] expected={expected_total:.3f}, actual={total_score:.3f} {status}")
-    
     
     def _extract_sequences_string(self, data_item) -> str:
         """Extract sequences string like kg_format.py."""

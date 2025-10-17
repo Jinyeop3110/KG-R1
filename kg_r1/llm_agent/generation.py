@@ -178,9 +178,9 @@ class LLMGenerationManager:
             re.compile(r'^query\s*[:\s]+', re.IGNORECASE),
         ]
         self.nested_pattern = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*\s*\(\s*(get_[a-zA-Z_]+\([^)]+\))\s*\)$')
-        # Strict patterns for single-entity functions (get_relations, get_head_relations, get_tail_relations)
-        self.get_relations_quoted_pattern = re.compile(r'^(get_relations|get_head_relations|get_tail_relations)\s*\(\s*"([^"]+)"\s*\)$')
-        self.get_relations_unquoted_pattern = re.compile(r'^(get_relations|get_head_relations|get_tail_relations)\s*\(\s*([^,)]+)\s*\)$')
+        # Strict patterns for single-entity functions (new: get_relations_in/out, legacy: get_head/tail_relations)
+        self.get_relations_quoted_pattern = re.compile(r'^(get_relations|get_relations_in|get_relations_out|get_head_relations|get_tail_relations)\s*\(\s*"([^"]+)"\s*\)$')
+        self.get_relations_unquoted_pattern = re.compile(r'^(get_relations|get_relations_in|get_relations_out|get_head_relations|get_tail_relations)\s*\(\s*([^,)]+)\s*\)$')
         
         # Original patterns for other functions that accept 2 arguments  
         self.quoted_function_pattern = re.compile(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*\(\s*"([^"]+)"\s*(?:,\s*"([^"]+)")?\s*\)$')
@@ -1058,34 +1058,37 @@ class LLMGenerationManager:
                 relation_name = parsed["relation_name"]
                 
                 # Client-side validation: Check if action_type is valid
-                valid_action_types = ["get_relations", "get_head_relations", "get_tail_relations", "get_head_entities", "get_tail_entities"]
+                valid_action_types = [
+                    "get_relations_in", "get_relations_out", "get_entities_in", "get_entities_out",  # New names
+                    "get_relations", "get_head_relations", "get_tail_relations", "get_head_entities", "get_tail_entities"  # Legacy
+                ]
                 if action_type not in valid_action_types:
                     # Create descriptive error message for invalid action type
                     error_msg = (
                         f"Invalid action type '{action_type}'. "
-                        f"Use one of: {', '.join(valid_action_types)}. "
-                        f"Example: get_head_relations(\"entity\") or get_tail_entities(\"entity\", \"relation\")"
+                        f"Use one of: get_relations_in, get_relations_out, get_entities_in, get_entities_out. "
+                        f"Example: get_relations_in(\"entity\") or get_entities_out(\"entity\", \"relation\")"
                     )
                     parsed_requests.append({
-                        "_is_client_error": True, 
+                        "_is_client_error": True,
                         "error_message": error_msg,
                     })
                     continue
-                
+
                 # Client-side validation: Check if entity_id is not empty
                 if not entity_id or not entity_id.strip():
                     error_msg = "Entity name cannot be empty. Provide a valid entity name in quotes."
                     parsed_requests.append({
-                        "_is_client_error": True, 
+                        "_is_client_error": True,
                         "error_message": error_msg,
                     })
                     continue
-                
+
                 # Client-side validation: Check relation requirements
-                if action_type in ["get_head_entities", "get_tail_entities"] and (not relation_name or not relation_name.strip()):
+                if action_type in ["get_entities_in", "get_entities_out", "get_head_entities", "get_tail_entities"] and (not relation_name or not relation_name.strip()):
                     error_msg = f"Relation name is required for {action_type}. Use format: {action_type}(\"entity\", \"relation\")"
                     parsed_requests.append({
-                        "_is_client_error": True, 
+                        "_is_client_error": True,
                         "error_message": error_msg,
                     })
                     continue
@@ -1340,8 +1343,8 @@ class LLMGenerationManager:
                 return response.json().get("actions", [])
         except Exception:
             pass
-        # Fallback to default actions
-        return ["get_relations", "get_head_relations", "get_tail_relations", "get_tail_entities", "get_head_entities"]
+        # Fallback to default actions (new naming scheme)
+        return ["get_relations_in", "get_relations_out", "get_entities_in", "get_entities_out"]
 
     def _create_query_format_error(self, query_content: str, original_error: str) -> str:
         """Create an LLM-friendly error message for query format issues."""
@@ -1421,11 +1424,11 @@ class LLMGenerationManager:
             action_type = quoted_match.group(1)
             
             # Reject single-entity functions with 2+ arguments - should have been caught above
-            if action_type in ["get_relations", "get_head_relations", "get_tail_relations"]:
+            if action_type in ["get_relations", "get_relations_in", "get_relations_out", "get_head_relations", "get_tail_relations"]:
                 error_msg = (
                     f"Invalid {action_type} format: '{query_content_str}'. "
                     f"{action_type} accepts only one entity argument: {action_type}(\"entity\"). "
-                    f"For relation-specific queries, use get_tail_entities(\"entity\", \"relation\") or get_head_entities(\"entity\", \"relation\")."
+                    f"For relation-specific queries, use get_entities_out(\"entity\", \"relation\") or get_entities_in(\"entity\", \"relation\")."
                 )
                 raise ValueError(error_msg)
             
@@ -1445,11 +1448,11 @@ class LLMGenerationManager:
             action_type = match.group(1).strip()
             
             # Reject single-entity functions with 2+ arguments - should have been caught above
-            if action_type in ["get_relations", "get_head_relations", "get_tail_relations"]:
+            if action_type in ["get_relations", "get_relations_in", "get_relations_out", "get_head_relations", "get_tail_relations"]:
                 error_msg = (
                     f"Invalid {action_type} format: '{query_content_str}'. "
                     f"{action_type} accepts only one entity argument: {action_type}(\"entity\") or {action_type}(entity). "
-                    f"For relation-specific queries, use get_tail_entities(\"entity\", \"relation\") or get_head_entities(\"entity\", \"relation\")."
+                    f"For relation-specific queries, use get_entities_out(\"entity\", \"relation\") or get_entities_in(\"entity\", \"relation\")."
                 )
                 raise ValueError(error_msg)
             
@@ -1478,9 +1481,9 @@ class LLMGenerationManager:
         # No valid format found - provide clear error message with quoted format examples
         error_msg = (
             f"Invalid query format: '{query_content_str}'. "
-            f"Use function call format like: get_head_relations(\"entity\") or get_tail_entities(\"entity\", \"relation\"). "
-            f"Available functions: get_head_relations(\"entity\"), get_tail_relations(\"entity\"), get_tail_entities(\"entity\", \"relation\"), get_head_entities(\"entity\", \"relation\"). "
-            f"Example: get_head_relations(\"Natalie Portman\")"
+            f"Use function call format like: get_relations_in(\"entity\") or get_entities_out(\"entity\", \"relation\"). "
+            f"Available functions: get_relations_in(\"entity\"), get_relations_out(\"entity\"), get_entities_out(\"entity\", \"relation\"), get_entities_in(\"entity\", \"relation\"). "
+            f"Example: get_relations_in(\"Natalie Portman\")"
         )
         raise ValueError(error_msg)
 

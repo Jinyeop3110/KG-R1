@@ -29,8 +29,7 @@ Available guideline levels:
 - "detailed_flat_multiTQ_v2_q5": Enhanced MultiTQ variant with improved temporal analysis and entity extraction strategies (5 queries)
 - "detailed_flat_multiTQ_v3": Advanced MultiTQ variant with multi-phase temporal reasoning and comprehensive analytical framework
 - "detailed_flat_10arxiv": 10ArXiv-specific research paper domain reasoning with academic terminology
-- "detailed_minimal": Minimal prompt with basic KG functions only (for clean evaluation without extensive guidance)
-- "detailed_minimal_5q": General minimal prompt with 5 kg-queries limit (clean evaluation)
+- "minimal" or "detailed_minimal": Minimal prompt with basic KG functions only (for clean evaluation without extensive guidance)
 - "vanilla": Simple direct answering without KG or reasoning instructions
 - "cot": Chain-of-Thought prompting with reasoning steps before answers
 """
@@ -183,10 +182,10 @@ You are allowed to make up to 7 kg-queries.
 If you encounter a KG-related error, read the error message carefully and correct your query.
 
 Use exactly these query functions:
-- get_tail_relations(entity): Returns relations where the entity is the subject/head.
-- get_head_relations(entity): Returns relations where the entity is the object/tail.
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation.
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation.
+- get_relations_out(entity): Returns outgoing relations where the entity is the subject/head (entity → relation → ?).
+- get_relations_in(entity): Returns incoming relations where the entity is the object/tail (? → relation → entity).
+- get_entities_out(entity, relation): Returns entities connected from the given entity by the specified relation (entity → relation → ?).
+- get_entities_in(entity, relation): Returns entities from which the given entity is connected by the specified relation (? → relation → entity).
 
 IMPORTANT:
 - Always begin with think after getting question or information.
@@ -209,10 +208,10 @@ Examples of relations:
 - "common.topic.notable_for"
 
 KG Query Examples:
-- get_tail_relations("Bahamas")
-- get_head_relations("Barack Obama")
-- get_tail_entities("Bahamas", "location.location.contains")
-- get_head_entities("Barack Obama", "people.person.nationality")
+- get_relations_out("Bahamas")
+- get_relations_in("Barack Obama")
+- get_entities_out("Bahamas", "location.location.contains")
+- get_entities_in("Barack Obama", "people.person.nationality")
 """
 
 DETAILED_GUIDELINE_HIERARCHICAL = """
@@ -220,10 +219,10 @@ You are allowed to make up to 5 kg-queries.
 If you encounter a KG-related error, read the error message carefully and correct your query.
 
 Use exactly these query functions:
-- get_tail_relations(entity): Returns relations where the entity is the subject/head.
-- get_head_relations(entity): Returns relations where the entity is the object/tail.
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation.
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation.
+- get_relations_out(entity): Returns outgoing relations where the entity is the subject/head (entity → relation → ?).
+- get_relations_in(entity): Returns incoming relations where the entity is the object/tail (? → relation → entity).
+- get_entities_out(entity, relation): Returns entities connected from the given entity by the specified relation (entity → relation → ?).
+- get_entities_in(entity, relation): Returns entities from which the given entity is connected by the specified relation (? → relation → entity).
 
 Relations are returned in hierarchical format grouped by domain → type → property. Example for get_head_relations:
 Head relations for entity "Barack Obama":
@@ -256,10 +255,10 @@ Examples of relations:
 - "common.topic.notable_for"
 
 KG Query Examples:
-- get_tail_relations("Bahamas")
-- get_head_relations("Barack Obama")
-- get_tail_entities("Bahamas", "location.location.contains")
-- get_head_entities("Barack Obama", "people.person.nationality")
+- get_relations_out("Bahamas")
+- get_relations_in("Barack Obama")
+- get_entities_out("Bahamas", "location.location.contains")
+- get_entities_in("Barack Obama", "people.person.nationality")
 """
 
 DETAILED_GUIDELINE_FLAT = """
@@ -267,10 +266,10 @@ You are allowed to make up to 5 kg-queries.
 If you encounter a KG-related error, read the error message carefully and correct your query.
 
 Use exactly these query functions:
-- get_tail_relations(entity): Returns relations where the entity is the subject/head.
-- get_head_relations(entity): Returns relations where the entity is the object/tail.
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation.
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation.
+- get_relations_out(entity): Returns outgoing relations where the entity is the subject/head (entity → relation → ?).
+- get_relations_in(entity): Returns incoming relations where the entity is the object/tail (? → relation → entity).
+- get_entities_out(entity, relation): Returns entities connected from the given entity by the specified relation (entity → relation → ?).
+- get_entities_in(entity, relation): Returns entities from which the given entity is connected by the specified relation (? → relation → entity).
 
 IMPORTANT:
 - Always begin with think after getting question or information.
@@ -293,10 +292,10 @@ Examples of relations:
 - "common.topic.notable_for"
 
 KG Query Examples:
-- get_tail_relations("Bahamas")
-- get_head_relations("Barack Obama")
-- get_tail_entities("Bahamas", "location.location.contains")
-- get_head_entities("Barack Obama", "people.person.nationality")
+- get_relations_out("Bahamas")
+- get_relations_in("Barack Obama")
+- get_entities_out("Bahamas", "location.location.contains")
+- get_entities_in("Barack Obama", "people.person.nationality")
 """
 
 DETAILED_GUIDELINE_FLAT_TURN7 = """
@@ -304,10 +303,10 @@ You are allowed to make up to 7 kg-queries across multiple reasoning turns.
 If you encounter a KG-related error, read the error message carefully and correct your query.
 
 Use exactly these query functions:
-- get_tail_relations(entity): Returns relations where the entity is the subject/head.
-- get_head_relations(entity): Returns relations where the entity is the object/tail.
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation.
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation.
+- get_relations_out(entity): Returns outgoing relations where the entity is the subject/head (entity → relation → ?).
+- get_relations_in(entity): Returns incoming relations where the entity is the object/tail (? → relation → entity).
+- get_entities_out(entity, relation): Returns entities connected from the given entity by the specified relation (entity → relation → ?).
+- get_entities_in(entity, relation): Returns entities from which the given entity is connected by the specified relation (? → relation → entity).
 
 IMPORTANT:
 - Always begin with think after getting question or information.
@@ -332,10 +331,10 @@ Examples of relations:
 - "common.topic.notable_for"
 
 KG Query Examples:
-- get_tail_relations("Bahamas")
-- get_head_relations("Barack Obama")
-- get_tail_entities("Bahamas", "location.location.contains")
-- get_head_entities("Barack Obama", "people.person.nationality")
+- get_relations_out("Bahamas")
+- get_relations_in("Barack Obama")
+- get_entities_out("Bahamas", "location.location.contains")
+- get_entities_in("Barack Obama", "people.person.nationality")
 """
 
 DETAILED_GUIDELINE_FLAT_MULTITQ = """
@@ -343,10 +342,10 @@ You are allowed to make up to 5 kg-queries for temporal reasoning.
 If you encounter a KG-related error, read the error message carefully and correct your query.
 
 Use exactly these query functions for MultiTQ temporal knowledge graph:
-- get_tail_relations(entity): Returns relations where the entity is the subject/head.
-- get_head_relations(entity): Returns relations where the entity is the object/tail.
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation, with timepoints.
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation, with timepoints.
+- get_relations_out(entity): Returns outgoing relations where the entity is the subject/head (entity → relation → ?).
+- get_relations_in(entity): Returns incoming relations where the entity is the object/tail (? → relation → entity).
+- get_entities_out(entity, relation): Returns entities connected to the given entity by the specified relation, with timepoints (entity → relation → ?).
+- get_entities_in(entity, relation): Returns entities from which the given entity is connected by the specified relation, with timepoints (? → relation → entity).
 
 Note: Entities returned by get_tail_entities and get_head_entities include timestamps in brackets (e.g., "Barack Obama [2005-01;2015-06]") showing when the relationship occurred.
 
@@ -371,10 +370,10 @@ Examples of relations:
 - "Member of"
 
 KG Query Examples:
-- get_tail_relations("Barack Obama")
-- get_head_relations("al-Shabaab insurgency")
-- get_tail_entities("Barack Obama", "Make statement")
-- get_head_entities("United Kingdom", "Participate in")
+- get_relations_out("Barack Obama")
+- get_relations_in("al-Shabaab insurgency")
+- get_entities_out("Barack Obama", "Make statement")
+- get_entities_in("United Kingdom", "Participate in")
 """
 
 DETAILED_GUIDELINE_FLAT_MULTITQ_V2 = """
@@ -382,10 +381,10 @@ You are allowed to make up to 7 kg-queries for enhanced temporal reasoning on Mu
 If you encounter a KG-related error, read the error message carefully and correct your query.
 
 Use exactly these query functions for MultiTQ temporal knowledge graph:
-- get_tail_relations(entity): Returns relations where the entity is the subject/head.
-- get_head_relations(entity): Returns relations where the entity is the object/tail.
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation, with timepoints.
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation, with timepoints.
+- get_relations_out(entity): Returns outgoing relations where the entity is the subject/head (entity → relation → ?).
+- get_relations_in(entity): Returns incoming relations where the entity is the object/tail (? → relation → entity).
+- get_entities_out(entity, relation): Returns entities connected to the given entity by the specified relation, with timepoints (entity → relation → ?).
+- get_entities_in(entity, relation): Returns entities from which the given entity is connected by the specified relation, with timepoints (? → relation → entity).
 
 Examples of entities:
 - Named entities: "Barack Obama", "Angela Merkel", "Xi Jinping", "Vladimir Putin", "Shinzo Abe", "Arab Spring", "Brexit referendum", "2016 U.S. election", "Ukrainian crisis", "United Nations", "European Union", "NATO", "ASEAN", "African Union", "United States", "China", "Germany", "Russia", "United Kingdom", "Government (Syria)", "Government (Libya)", "Government (Egypt)", "Protester (Egypt)", "Military (Ukraine)", "Business (China)", "Citizen (Greece)"
@@ -399,10 +398,10 @@ You are allowed to make up to 5 kg-queries for enhanced temporal reasoning on Mu
 If you encounter a KG-related error, read the error message carefully and correct your query.
 
 Use exactly these query functions for MultiTQ temporal knowledge graph:
-- get_tail_relations(entity): Returns relations where the entity is the subject/head.
-- get_head_relations(entity): Returns relations where the entity is the object/tail.
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation, with timepoints.
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation, with timepoints.
+- get_relations_out(entity): Returns outgoing relations where the entity is the subject/head (entity → relation → ?).
+- get_relations_in(entity): Returns incoming relations where the entity is the object/tail (? → relation → entity).
+- get_entities_out(entity, relation): Returns entities connected to the given entity by the specified relation, with timepoints (entity → relation → ?).
+- get_entities_in(entity, relation): Returns entities from which the given entity is connected by the specified relation, with timepoints (? → relation → entity).
 
 Examples of entities:
 - Named entities: "Barack Obama", "Angela Merkel", "Xi Jinping", "Vladimir Putin", "Shinzo Abe", "Arab Spring", "Brexit referendum", "2016 U.S. election", "Ukrainian crisis", "United Nations", "European Union", "NATO", "ASEAN", "African Union", "United States", "China", "Germany", "Russia", "United Kingdom", "Government (Syria)", "Government (Libya)", "Government (Egypt)", "Protester (Egypt)", "Military (Ukraine)", "Business (China)", "Citizen (Greece)"
@@ -411,27 +410,14 @@ IMPORTANT:
 - Your answer can be multiple entities (e.g., <answer>Barack Obama</answer>, <answer>Joe Biden</answer>) or multiple time points (e.g., <answer>2005-01</answer>, <answer>2015-06</answer>) or a single entity/time point
 """
 
-DETAILED_GUIDELINE_MINIMAL="""
-You are allowed to make up to 7 kg-queries for research paper domain reasoning.
-If you encounter a KG-related error, read the error message carefully and correct your query.
-
-Use exactly these query functions for 10ArXiv research knowledge graph:
-- get_tail_relations(entity): Returns tail relations where the entity is the subject/head (entity → tail_relation → ?).
-- get_head_relations(entity): Returns head relations where the entity is the object/tail (? → head_relation → entity).
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation (entity → relation → ?).
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation (? → relation → entity).
-
-"""
-
-DETAILED_GUIDELINE_MINIMAL_5Q = """
-You are allowed to make up to 5 kg-queries.
+DETAILED_GUIDELINE_MINIMAL = """
 If you encounter a KG-related error, read the error message carefully and correct your query.
 
 Use exactly these query functions:
-- get_tail_relations(entity): Returns tail relations where the entity is the subject/head.
-- get_head_relations(entity): Returns head relations where the entity is the object/tail.
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation.
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation.
+- get_relations_out(entity): Returns outgoing relations where the entity is the subject/head.
+- get_relations_in(entity): Returns incoming relations where the entity is the object/tail.
+- get_entities_out(entity, relation): Returns entities connected to the given entity by the specified relation.
+- get_entities_in(entity, relation): Returns entities from which the given entity is connected by the specified relation.
 """
 
 DETAILED_GUIDELINE_FLAT_10ARXIV = """
@@ -439,10 +425,10 @@ You are allowed to make up to 7 kg-queries for research paper domain reasoning.
 If you encounter a KG-related error, read the error message carefully and correct your query.
 
 Use exactly these query functions for 10ArXiv research knowledge graph:
-- get_tail_relations(entity): Returns relations where the entity is the subject/head.
-- get_head_relations(entity): Returns relations where the entity is the object/tail.
-- get_tail_entities(entity, relation): Returns entities connected to the given entity by the specified relation.
-- get_head_entities(entity, relation): Returns entities from which the given entity is connected by the specified relation.
+- get_relations_out(entity): Returns outgoing relations where the entity is the subject/head (entity → relation → ?).
+- get_relations_in(entity): Returns incoming relations where the entity is the object/tail (? → relation → entity).
+- get_entities_out(entity, relation): Returns entities connected to the given entity by the specified relation (entity → relation → ?).
+- get_entities_in(entity, relation): Returns entities from which the given entity is connected by the specified relation (? → relation → entity).
 
 IMPORTANT:
 - Always begin with <think> after getting question or information.
@@ -470,10 +456,10 @@ Examples of research relations:
 - "ENHANCES"
 
 KG Query Examples:
-- get_tail_relations("ASTRA")
-- get_head_relations("RETRIEVAL AUGMENTED GENERATION")
-- get_tail_entities("RAG", "USED_IN")
-- get_head_entities("NATURAL LANGUAGE PROCESSING", "INCLUDES")
+- get_relations_out("ASTRA")
+- get_relations_in("RETRIEVAL AUGMENTED GENERATION")
+- get_entities_out("RAG", "USED_IN")
+- get_entities_in("NATURAL LANGUAGE PROCESSING", "INCLUDES")
 """
 
 
@@ -542,10 +528,8 @@ class PromptAugmentor:
             return DETAILED_GUIDELINE_FLAT_MULTITQ_V3
         elif self.guideline_level == "detailed_flat_10arxiv":
             return DETAILED_GUIDELINE_FLAT_10ARXIV
-        elif self.guideline_level == "detailed_minimal":
+        elif self.guideline_level == "detailed_minimal" or self.guideline_level == "minimal":
             return DETAILED_GUIDELINE_MINIMAL
-        elif self.guideline_level == "detailed_minimal_5q":
-            return DETAILED_GUIDELINE_MINIMAL_5Q
         elif self.guideline_level == "vanilla":
             return VANILLA_GUIDELINE
         elif self.guideline_level == "cot":
